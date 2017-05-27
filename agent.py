@@ -176,6 +176,9 @@ class QLambdaTrainer():
         values = []
         steps = deque(maxlen=100)
         lr = self.learning_rate
+        self.policy_pi = make_epsilon_greedy_policy(self.agent.q.table,
+                                                    self.epsilon,
+                                                    self.agent.q.n_actions)
         for i in range(episode_count):
             # policy
             self.policy_mu = make_epsilon_greedy_policy(self.agent.q.table,
@@ -195,7 +198,7 @@ class QLambdaTrainer():
                     env.render()
 
                 p = self.policy_mu(state)
-                print("probabilities = {}".format(p))
+                # print("probabilities = {}".format(p))
                 action = np.random.choice(self.agent.q.n_actions, 1, p=p)[0]
                 obs, reward, done, info = env.step(action)
 
@@ -208,13 +211,10 @@ class QLambdaTrainer():
 
             steps.append(step)
             e = defaultdict(lambda : np.zeros(self.agent.q.n_actions))
-            self.policy_pi = make_epsilon_greedy_policy(self.agent.q.table,
-                                                        self.epsilon,
-                                                        self.agent.q.n_actions)
             for t in range(step-1):
                 delta = rewards[t]
                 for n_action in range(self.agent.q.n_actions):
-                    p = self.policy_pi(states[t])
+                    p = self.policy_pi(states[t+1])
                     delta += self.gamma * self.agent.q.table[states[t+1]][n_action] * p[n_action]
                 delta -= self.agent.q.table[states[t]][actions[t]]
                 for state in self.agent.q.table.keys():
@@ -223,6 +223,7 @@ class QLambdaTrainer():
                         if state == states[t] and action == actions[t]:
                             e[state][action] += 1.0
                         self.agent.q.table[state][action] += self.alpha * delta * e[state][action]
-                        print("alpha = {}, delta = {}, e[state][action] = {}".format(self.alpha, delta, e[state][action]))
-                        print(self.alpha * delta * e[state][action])
+                        # print("alpha = {}, delta = {}, e[state][action] = {}".format(self.alpha, delta, e[state][action]))
+                        # print(self.alpha * delta * e[state][action])
+
             print(np.mean(steps))

@@ -26,10 +26,11 @@ def main(episodes, render, monitor):
     trainer = QLambdaTrainer(
         agent,
         gamma=0.99,
-        learning_rate=0.5, learning_rate_decay=learning_decay,
-        epsilon=1.0, epsilon_decay=epsilon_decay,
-        max_step=250,
-        lam=0.5)
+        learning_rate=0.3, learning_rate_decay=learning_decay,
+        epsilon=0.3, epsilon_decay=epsilon_decay,
+        max_step=1000,
+        lam=0.9,
+        alpha=0.3)
     # trainer = Trainer(
     #     agent,
     #     gamma=0.99,
@@ -48,7 +49,7 @@ def main(episodes, render, monitor):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="train & run cartpole ")
-    parser.add_argument("--episode", type=int, default=1000, help="episode to train")
+    parser.add_argument("--episode", type=int, default=50000, help="episode to train")
     parser.add_argument("--render", action="store_true", help="render the screen")
     parser.add_argument("--monitor", action="store_true", help="monitor")
     parser.add_argument("--upload", type=str, default="", help="upload key to openai gym (training is not executed)")
