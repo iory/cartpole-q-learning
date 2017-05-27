@@ -176,9 +176,6 @@ class QLambdaTrainer():
         values = []
         steps = deque(maxlen=100)
         lr = self.learning_rate
-        self.policy_pi = make_epsilon_greedy_policy(self.agent.q.table,
-                                                    self.epsilon,
-                                                    self.agent.q.n_actions)
         for i in range(episode_count):
             # policy
             self.policy_mu = make_epsilon_greedy_policy(self.agent.q.table,
@@ -211,6 +208,9 @@ class QLambdaTrainer():
 
             steps.append(step)
             e = defaultdict(lambda : np.zeros(self.agent.q.n_actions))
+            self.policy_pi = make_epsilon_greedy_policy(self.agent.q.table,
+                                                        self.epsilon,
+                                                        self.agent.q.n_actions)
             for t in range(step-1):
                 delta = rewards[t]
                 for n_action in range(self.agent.q.n_actions):

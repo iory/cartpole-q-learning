@@ -30,7 +30,7 @@ def main(episodes, render, monitor):
         epsilon=0.3, epsilon_decay=epsilon_decay,
         max_step=1000,
         lam=0.9,
-        alpha=0.3)
+        alpha=0.1)
     # trainer = Trainer(
     #     agent,
     #     gamma=0.99,
