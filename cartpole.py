@@ -9,23 +9,23 @@ RECORD_PATH = os.path.join(os.path.dirname(__file__), "./upload")
 
 
 def main(episodes, render, monitor):
-    env = gym.make("CartPole-v0") 
+    env = gym.make("CartPole-v0")
 
     q = Q(
-        env.action_space.n, 
-        env.observation_space, 
+        env.action_space.n,
+        env.observation_space,
         bin_size=[3, 3, 8, 5],
-        low_bound=[None, -0.5, None, -math.radians(50)], 
+        low_bound=[None, -0.5, None, -math.radians(50)],
         high_bound=[None, 0.5, None, math.radians(50)]
         )
     agent = Agent(q, epsilon=0.05)
 
-    learning_decay = lambda lr, t: max(0.1, min(0.5, 1.0 - math.log10((t + 1) / 25)))
-    epsilon_decay = lambda eps, t: max(0.01, min(1.0, 1.0 - math.log10((t + 1) / 25)))
+    learning_decay = (lambda lr, t: max(0.1, min(0.5, 1.0 - math.log10((t + 1) / 25.0))))
+    epsilon_decay = (lambda eps, t: max(0.01, min(1.0, 1.0 - math.log10((t + 1) / 25.0))))
     trainer = Trainer(
-        agent, 
+        agent,
         gamma=0.99,
-        learning_rate=0.5, learning_rate_decay=learning_decay, 
+        learning_rate=0.5, learning_rate_decay=learning_decay,
         epsilon=1.0, epsilon_decay=epsilon_decay,
         max_step=250)
 

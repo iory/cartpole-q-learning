@@ -23,14 +23,14 @@ class Q():
 
         # if we encounter the new observation, we initialize action evaluations
         self.table = defaultdict(lambda: initial_std * np.random.randn(self.n_actions) + initial_mean)
-    
+
     @classmethod
     def _make_bins(cls, low, high, bin_size):
         bins = np.arange(low, high, (float(high) - float(low)) / (bin_size - 2))  # exclude both ends
         if min(bins) < 0 and 0 not in bins:
             bins = np.sort(np.append(bins, [0]))  # 0 centric bins
         return bins
-    
+
     @classmethod
     def _low_high_iter(cls, observation_space, low_bound, high_bound):
         lows = observation_space.low
@@ -40,12 +40,12 @@ class Q():
             if low_bound is not None:
                 _low_bound = low_bound if not isinstance(low_bound, list) else low_bound[i]
                 low = low if _low_bound is None else max(low, _low_bound)
-            
+
             high = highs[i]
             if high_bound is not None:
                 _high_bound = high_bound if not isinstance(high_bound, list) else high_bound[i]
                 high = high if _high_bound is None else min(high, _high_bound)
-            
+
             yield i, low, high
 
     def observation_to_state(self, observation):
@@ -54,26 +54,28 @@ class Q():
         unit = max(self._bin_sizes)
         for d, o in enumerate(observation.flatten()):
             state = state + np.digitize(o, self._dimension_bins[d]) * pow(unit, d)  # bin_size numeral system
+        # print(self._dimension_bins)
+        # print("observation = {}, state = {}".format(observation, state))
         return state
-    
+
     def values(self, observation):
         state = self.observation_to_state(observation)
         return self.table[state]
 
 
-class Agent():
+class Agent(object):
 
     def __init__(self, q, epsilon=0.05):
         self.q = q
         self.epsilon = epsilon
-    
+
     def act(self, observation):
         action = -1
         if np.random.random() < self.epsilon:
             action = np.random.choice(self.q.n_actions)
         else:
             action = np.argmax(self.q.values(observation))
-        
+
         return action
 
 
@@ -122,8 +124,90 @@ class Trainer():
                 print("Episode {}: {}steps(avg{}). epsilon={:.3f}, lr={:.3f}, mean q value={:.2f}".format(
                     i, step, mean_step, self.agent.epsilon, lr, mean)
                     )
-                
-                if self.epsilon_decay is not None:                
+
+                if self.epsilon_decay is not None:
                     self.agent.epsilon = self.epsilon_decay(self.agent.epsilon, i)
                 if self.learning_rate_decay is not None:
                     lr = self.learning_rate_decay(lr, i)
+
+
+def make_epsilon_greedy_policy(Q, epsilon, nA):
+    """
+    Creates an epsilon-greedy policy based on a given Q-function and epsilon.
+
+    Args:
+        Q: A dictionary that maps from state -> action-values.
+            Each value is a numpy array of length nA (see below)
+        epsilon: The probability to select a random action . float between 0 and 1.
+        nA: Number of actions in the environment.
+
+    Returns:
+        A function that takes the observation as an argument and returns
+        the probabilities for each action in the form of a numpy array of length nA.
+
+    """
+    def policy_fn(observation):
+        A = np.ones(nA, dtype=float) * epsilon / nA
+        print(observation)
+        best_action = np.argmax(Q[observation])
+        A[best_action] += (1.0 - epsilon)
+        return A
+    return policy_fn
+
+
+class QLambdaTrainer():
+
+    def __init__(self, agent, gamma=0.95, learning_rate=0.1,
+                 learning_rate_decay=None, epsilon=0.05, epsilon_decay=None, max_step=-1,
+                 lam=0.5):
+        self.agent = agent
+        self.gamma = gamma
+        self.learning_rate = learning_rate
+        self.learning_rate_decay = learning_rate_decay
+        self.epsilon = epsilon
+        self.epsilon_decay = epsilon_decay
+        self.max_step = max_step
+        self.lam = lam
+
+        # policy
+        self.policy_mu = make_epsilon_greedy_policy(self.qgent.q.values,
+                                                    self.epsilon,
+                                                    self.agent.q.n_actions)
+
+    def train(self, env, episode_count, render=False):
+        default_epsilon = self.agent.epsilon
+        self.agent.epsilon = self.epsilon
+        values = []
+        steps = deque(maxlen=100)
+        lr = self.learning_rate
+        for i in range(episode_count):
+            obs = env.reset()
+            step = 0
+            done = False
+            states = []
+            actions = []
+            rewards = []
+            while not done:
+                if render:
+                    env.render()
+
+                action = self.policy_mu(obs)
+                obs, reward, done, info = env.step(action)
+
+                state = self.agent.q.observation_to_state(obs)
+                states.append(state)
+                actions.append(action)
+                rewards.append(reward)
+
+                step += 1
+
+            e = defaultdict(lambda : np.zeros(self.agent.q.n_actions))
+            for t in range(step):
+                delta = reward[t]
+                for n_action in range(self.agent.q.n_actions):
+                    delta += self.gamma * self.agent.q.values[n_action] * self.policy_pi[n_action]
+                delta -= self.agent.q.value
+                for state in states:
+                    for action in actions:
+                        e[state][action] = self.lam * self.gamma * e[state][action]
+                        self.q.values[state][action] += self.alpha * self.delta * e[state][action]
