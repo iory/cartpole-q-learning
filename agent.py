@@ -122,8 +122,7 @@ class Trainer():
                 steps.append(step)
                 mean_step = np.mean(steps)
                 print("Episode {}: {}steps(avg{}). epsilon={:.3f}, lr={:.3f}, mean q value={:.2f}".format(
-                    i, step, mean_step, self.agent.epsilon, lr, mean)
-                    )
+                    i, step, mean_step, self.agent.epsilon, lr, mean))
 
                 if self.epsilon_decay is not None:
                     self.agent.epsilon = self.epsilon_decay(self.agent.epsilon, i)
@@ -148,7 +147,6 @@ def make_epsilon_greedy_policy(Q, epsilon, nA):
     """
     def policy_fn(observation):
         A = np.ones(nA, dtype=float) * epsilon / nA
-        print(observation)
         best_action = np.argmax(Q[observation])
         A[best_action] += (1.0 - epsilon)
         return A
@@ -159,7 +157,9 @@ class QLambdaTrainer():
 
     def __init__(self, agent, gamma=0.95, learning_rate=0.1,
                  learning_rate_decay=None, epsilon=0.05, epsilon_decay=None, max_step=-1,
+                 alpha=1.0,
                  lam=0.5):
+        self.alpha = alpha
         self.agent = agent
         self.gamma = gamma
         self.learning_rate = learning_rate
@@ -169,10 +169,6 @@ class QLambdaTrainer():
         self.max_step = max_step
         self.lam = lam
 
-        # policy
-        self.policy_mu = make_epsilon_greedy_policy(self.qgent.q.values,
-                                                    self.epsilon,
-                                                    self.agent.q.n_actions)
 
     def train(self, env, episode_count, render=False):
         default_epsilon = self.agent.epsilon
@@ -181,17 +177,26 @@ class QLambdaTrainer():
         steps = deque(maxlen=100)
         lr = self.learning_rate
         for i in range(episode_count):
+            # policy
+            self.policy_mu = make_epsilon_greedy_policy(self.agent.q.table,
+                                                        self.epsilon,
+                                                        self.agent.q.n_actions)
             obs = env.reset()
+            state = self.agent.q.observation_to_state(obs)
             step = 0
             done = False
             states = []
             actions = []
             rewards = []
+
+            states.append(state)
             while not done:
                 if render:
                     env.render()
 
-                action = self.policy_mu(obs)
+                p = self.policy_mu(state)
+                print("probabilities = {}".format(p))
+                action = np.random.choice(self.agent.q.n_actions, 1, p=p)[0]
                 obs, reward, done, info = env.step(action)
 
                 state = self.agent.q.observation_to_state(obs)
@@ -201,13 +206,23 @@ class QLambdaTrainer():
 
                 step += 1
 
+            steps.append(step)
             e = defaultdict(lambda : np.zeros(self.agent.q.n_actions))
-            for t in range(step):
-                delta = reward[t]
+            self.policy_pi = make_epsilon_greedy_policy(self.agent.q.table,
+                                                        self.epsilon,
+                                                        self.agent.q.n_actions)
+            for t in range(step-1):
+                delta = rewards[t]
                 for n_action in range(self.agent.q.n_actions):
-                    delta += self.gamma * self.agent.q.values[n_action] * self.policy_pi[n_action]
-                delta -= self.agent.q.value
-                for state in states:
-                    for action in actions:
+                    p = self.policy_pi(states[t])
+                    delta += self.gamma * self.agent.q.table[states[t+1]][n_action] * p[n_action]
+                delta -= self.agent.q.table[states[t]][actions[t]]
+                for state in self.agent.q.table.keys():
+                    for action in range(self.agent.q.n_actions):
                         e[state][action] = self.lam * self.gamma * e[state][action]
-                        self.q.values[state][action] += self.alpha * self.delta * e[state][action]
+                        if state == states[t] and action == actions[t]:
+                            e[state][action] += 1.0
+                        self.agent.q.table[state][action] += self.alpha * delta * e[state][action]
+                        print("alpha = {}, delta = {}, e[state][action] = {}".format(self.alpha, delta, e[state][action]))
+                        print(self.alpha * delta * e[state][action])
+            print(np.mean(steps))

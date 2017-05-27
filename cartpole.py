@@ -3,6 +3,7 @@ import math
 import argparse
 import gym
 from agent import Q, Agent, Trainer
+from agent import QLambdaTrainer
 
 
 RECORD_PATH = os.path.join(os.path.dirname(__file__), "./upload")
@@ -22,12 +23,19 @@ def main(episodes, render, monitor):
 
     learning_decay = (lambda lr, t: max(0.1, min(0.5, 1.0 - math.log10((t + 1) / 25.0))))
     epsilon_decay = (lambda eps, t: max(0.01, min(1.0, 1.0 - math.log10((t + 1) / 25.0))))
-    trainer = Trainer(
+    trainer = QLambdaTrainer(
         agent,
         gamma=0.99,
         learning_rate=0.5, learning_rate_decay=learning_decay,
         epsilon=1.0, epsilon_decay=epsilon_decay,
-        max_step=250)
+        max_step=250,
+        lam=0.5)
+    # trainer = Trainer(
+    #     agent,
+    #     gamma=0.99,
+    #     learning_rate=0.5, learning_rate_decay=learning_decay,
+    #     epsilon=1.0, epsilon_decay=epsilon_decay,
+    #     max_step=250)
 
     if monitor:
         env.monitor.start(RECORD_PATH)
